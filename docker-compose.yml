@@ -1,13 +1,22 @@
 ﻿services:
-  elasticdemo:
-    build:
-      context: .
-      dockerfile: ElasticDemo/Dockerfile
-    ports:
-      - "5107:8080"
-    environment:
-      - ASPNETCORE_URLS=http://+:8080
-      - ASPNETCORE_ENVIRONMENT=Development
+#  elasticdemo:
+#    build:
+#      context: .
+#      dockerfile: ElasticDemo/Dockerfile
+#    ports:
+#      - "5000:80"
+#    environment:
+#      - ASPNETCORE_URLS=http://+:80
+#      - ASPNETCORE_ENVIRONMENT=Development
+#    depends_on:
+#      - elasticsearch
+#    command: >
+#      /bin/sh -c "
+#      while ! curl -s http://localhost:9200; do
+#        echo 'Waiting for Elasticsearch...';
+#        sleep 10;
+#      done;
+#      dotnet run"
 
   elasticsearch:
     image: elasticsearch:8.15.3
@@ -18,14 +27,19 @@
       - 9200:9200
     volumes:
       - elasticsearch-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:9200" ]
+      interval: 30s
+      timeout: 15s
+      retries: 5
 
   kibana:
     image: kibana:8.15.3
     ports:
       - 5601:5601
     environment:
-      - ELASTICSEARCH_HOST=http://elasticsearch:9200
+      - ELASTICSEARCH_HOST=http://localhost:9200
 
 volumes:
   elasticsearch-data:
-    driver: local
+    driver: data
