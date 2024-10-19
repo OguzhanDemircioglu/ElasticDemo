@@ -1,0 +1,6 @@
+﻿services:
+  elasticdemo:
+    image: elasticdemo
+    build:
+      context: .
+      dockerfile: ElasticDemo/Dockerfile
