@@ -1,3 +1,4 @@
+using Bogus;
 using Elastic.Clients.Elasticsearch;
 using ElasticDemo.dtos;
 using ElasticDemo.Models;
@@ -55,17 +56,91 @@ app.MapPost("/products/create", async (CreateProductDto request, CancellationTok
     return Results.Ok(createResponse.Id);
 });
 
-app.MapGet("/products/getAll", async (CancellationToken cancellationToken) =>
+app.MapPut("/products/update", async (UpdateProductDto request, CancellationToken cancellationToken) =>
 {
-    var response = await client.SearchAsync<Product>("products", cancellationToken);
-
-    if (response == null || !response.IsValidResponse)
+    UpdateRequest<Product, UpdateProductDto> updateRequest = new("products", request.Id.ToString())
     {
-        return Results.NotFound("Arama işlemi başarısız oldu veya geçerli bir yanıt alınamadı.");
-    }
+        Doc = request,
+    };
 
-    return Results.Ok(response.Documents ?? new List<Product>());
+    await client.UpdateAsync(updateRequest, cancellationToken);
+
+    return Results.Ok(new { message = "Update is Successful" });
 });
 
+app.MapDelete("/products/deleteById", async (Guid id, CancellationToken cancellationToken) =>
+{
+    DeleteResponse deleteResponse = await client.DeleteAsync("products", id, cancellationToken);
+
+    return Results.Ok(new { message = "Delete is Successful" });
+});
+
+app.MapGet("/products/getAll", async (CancellationToken cancellationToken) =>
+{
+    SearchRequest searchRequest = new("products")
+    {
+        Size = 100,
+        Sort = new List<SortOptions>
+        {
+            SortOptions.Field(new Field("name.keyword"), new FieldSort() { Order = SortOrder.Asc }),
+        },
+        //Query = new MatchQuery(new Field("name"))
+        //{
+        //    Query = "domates"
+        //},
+        //Query = new WildcardQuery(new Field("name"))
+        //{
+        //   Value = "*domates*"
+        //},
+        //Query = new FuzzyQuery(new Field("name"))
+        //{
+        //    Value = "domatse"
+        //},
+        // Query = new BoolQuery
+        // {
+        //     Should = new Query[]
+        //     {
+        //         new MatchQuery(new Field("name"))
+        //         {
+        //             Query = "domates"
+        //         },
+        //         new FuzzyQuery(new Field("description"))
+        //         {
+        //             Value = "domatse"
+        //         }
+        //     }
+        // }
+    };
+
+    var response = await client.SearchAsync<Product>(searchRequest, cancellationToken);
+
+    return response is not { IsValidResponse: true }
+        ? Results.NotFound("Arama işlemi başarısız oldu veya geçerli bir yanıt alınamadı.")
+        : Results.Ok(response.Documents);
+});
+
+app.MapGet("/products/seedData", async (CancellationToken cancellationToken) =>
+{
+    for (int i = 0; i < 100; i++)
+    {
+        Faker faker = new();
+        Product product = new()
+        {
+            Name = faker.Commerce.ProductName(),
+            Price = Convert.ToDecimal(faker.Commerce.Price()),
+            Stock = faker.Commerce.Random.Int(1, 20),
+            Description = faker.Commerce.ProductDescription()
+        };
+
+        CreateRequest<Product> createRequest = new(product.Id.ToString())
+        {
+            Document = product
+        };
+
+        await client.CreateAsync(createRequest, cancellationToken);
+    }
+
+    return Results.Created();
+});
 
 app.Run();
